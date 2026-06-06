@@ -1,0 +1,67 @@
+spring:
+  application:
+    name: bedrock-rag-chat
+  cache:
+    type: caffeine
+
+server:
+  port: 8080
+
+aws:
+  region: us-east-1   # replace with your target region
+
+bedrock:
+  model:
+    primary: amazon.nova-lite-v1:0
+    fallback: amazon.nova-micro-v1:0
+  knowledgebase:
+    id: PLACEHOLDER_KB_ID
+  guardrail:
+    id: PLACEHOLDER_GUARDRAIL_ID
+    version: "DRAFT"   # or a published numeric version
+
+dynamodb:
+  table:
+    chat-history: bedrock-rag-chat-history
+    audit-log: bedrock-rag-audit-log
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  metrics:
+    export:
+      cloudwatch:
+        enabled: false   # set true when deploying to AWS
+        namespace: BedrockRagChat
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      bedrock:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 30s
+        permittedNumberOfCallsInHalfOpenState: 3
+        registerHealthIndicator: true
+  retry:
+    instances:
+      bedrock:
+        maxAttempts: 3
+        waitDuration: 2s
+        exponentialBackoffMultiplier: 2
+        retryExceptions:
+          - software.amazon.awssdk.services.bedrockruntime.model.ThrottlingException
+          - software.amazon.awssdk.core.exception.SdkServiceException
+  timelimiter:
+    instances:
+      bedrock:
+        timeoutDuration: 10s
+
+logging:
+  pattern:
+    console: "%d{ISO8601} [%thread] [%X{traceId}] %-5level %logger{36} - %msg%n"
+  level:
+    com.sudiptapaul.bedrock: DEBUG
+    software.amazon.awssdk: WARN
